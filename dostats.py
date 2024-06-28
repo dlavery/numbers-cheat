@@ -3,11 +3,14 @@ import json
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
+    statsfile_name = input("File? (stats.json) ")
+    if not statsfile_name:
+        statsfile_name = "stats.json"
     try:
-        f = open('stats.json', 'r')
+        f = open(statsfile_name, 'r')
         stats = json.loads(f.read())
     except:
-        print("Stats file missing or corrupt, please run donumbers.py")
+        print("Stats file missing or corrupt, please check name or run donumbers.py to create default file")
         exit()
     while True:
         ans = input("Select view: counts(1) or times(2): ").strip().lower()

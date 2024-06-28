@@ -247,7 +247,9 @@ if __name__ == '__main__':
     #print('do_4_2_split', do_4_2_split([100, 6, 1, 50, 2, 1], 708, False))
     #print('do_split 4', do_split([100, 6, 1, 50, 2, 1], 4, 708, False))
     #print('do_3_3_split', do_3_3_split([100, 6, 1, 50, 2, 1], 708, False))
-    print('do_split 3', do_split([100, 6, 1, 50, 2, 1], 3, 708, False))
+    '''print('do_split 3', do_split([100, 6, 1, 50, 2, 1], 3, 708, False))
     print('do_split 3', do_split([100, 1, 6, 10, 8, 9], 3, 381, False))
     print('do_split 3', do_split([75, 50, 25, 5, 8, 8], 3, 852, False))
-    print('do_split 4', do_split([75, 50, 25, 5, 8, 8], 4, 852, False))
+    print('do_split 4', do_split([75, 50, 25, 5, 8, 8], 4, 852, False))'''
+
+    print('do_split_4', do_split([100, 6, 2, 1, 3, 1], 4, 831, False))

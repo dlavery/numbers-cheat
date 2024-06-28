@@ -10,6 +10,7 @@ from itertools import product
 from numberutils import factorize_by_trial_division
 
 LARGE_NUMBERS = [100, 75, 50, 25]
+checkpoint = False
 
 def complement(a:list, b:tuple):
     c = a.copy()
@@ -338,7 +339,7 @@ def do_numbers(nos:list[int], target:int, variance:int, silent:bool=False) -> tu
     can only be used once).
     '''
     if target in nos:
-        return (str(target), target, 0)
+        return (str(int(target)), target, 0)
     res = ()
     noslen = len(nos)
     i = 2
@@ -350,16 +351,16 @@ def do_numbers(nos:list[int], target:int, variance:int, silent:bool=False) -> tu
             #    return(res)
             #else:
             #    print("Timeout warning!")
-            if res:
-                checkpoint = False
-                newnos = strip_numbers(res[0], nos)
-                newres = do_numbers(newnos, abs(res[2]), 0, silent=True)
-                checkpoint = True
-                if newres:
-                    if res[1] > 0:
-                        return (res[0]+"+"+newres[0], target, 0)
-                    else:
-                        return (res[0]+"-"+newres[0], target, 0)
+            #if res:
+            #    checkpoint = False
+            #    newnos = strip_numbers(res[0], nos)
+            #    newres = do_numbers(newnos, abs(res[2]), 0, silent=True)
+            #    checkpoint = True
+            #    if newres:
+            #        if res[1] > 0:
+            #            return (res[0]+"+"+newres[0], target, 0)
+            #        else:
+            #            return (res[0]+"-"+newres[0], target, 0)
             print("Best:", format_solution(res))
             ex = input("Stop(N)? ") or 'N'
             if ex.upper() != 'N':
@@ -368,10 +369,11 @@ def do_numbers(nos:list[int], target:int, variance:int, silent:bool=False) -> tu
             print("Best:", format_solution(res))
 
         res2 = crunch_numbers(nos, i, target, variance)
-        if res2 and res2[2] == 0:
-            res = res2
-            break
-        if res2:
+        ok = check_solution(res2)
+        if ok:
+            if res2[2] == 0:
+                res = res2
+                break
             if not res:
                 res = res2
             elif abs(res2[2]) < abs(res[2]):
@@ -709,36 +711,116 @@ def do_split(numbers:list[int], size:int, target:int, debug:bool=False) -> tuple
                 continue
     return ()
 
+def check_solution(solutions:tuple) -> bool:
+    if not solutions:
+        return False
+    quotients = re.findall(r'\d+/\d+', solutions[0])
+    for q in quotients:
+        eval_q = eval(q)
+        if eval_q != int(eval_q):
+            return False
+    return True
+
 def format_solution(solutions:tuple) -> str:
     if solutions:
         return solutions[0]+' | '+str(solutions[1])+' | '+str(solutions[2])
     else:
         return "No solution"
 
+def numbers_main(number_list:list[int], target:int, silent:bool=False, autofile:bool=False) -> tuple:
+    starttime = time.time()
+    if autofile:
+        statsfile_name = 'stats-'+autofile+'.json'
+    else:
+        statsfile_name = "stats.json"
+    global checkpoint
+    checkpoint = False
+    solutions = None
+    if not solutions:
+        attempting = "do_split 3,3"
+        if not silent:
+            print(attempting)
+        checkpointtime = time.time()
+        solutions = do_split(number_list, 3, target, False)
+    if not solutions:
+        attempting = "do_small_factorization"
+        if not silent:
+            print(attempting)
+        checkpointtime = time.time()
+        solutions = do_small_factorization(number_list, target)
+    if not solutions:
+        attempting = "do_prime_factorization"
+        if not silent:
+            print(attempting)
+        checkpointtime = time.time()
+        solutions = do_prime_factorization(number_list, target)
+    if not solutions:
+        attempting = "do_rough_factorization"
+        if not silent:
+            print(attempting)
+        checkpointtime = time.time()
+        solutions = do_rough_factorization(number_list, target)
+    if not solutions:
+        attempting = "do_rough_rough_factorization"
+        if not silent:
+            print(attempting)
+        checkpointtime = time.time()
+        solutions = do_rough_rough_factorization(number_list, target)
+    if not solutions or solutions[2] != 0:
+        attempting = "do_numbers_(brute_force)"
+        if not silent:
+            checkpoint = True
+            print(attempting)
+        checkpointtime = time.time()
+        solutions = do_numbers(number_list, target, 100, silent)
+    currenttime = time.time()
+    time_taken = int(currenttime-starttime)+1
+    step_time = int(currenttime-checkpointtime)+1
+    if solutions and solutions[2] == 0:
+        # Log how solution was achieved to provide stats to help improve
+        statsfile = None
+        try:
+            statsfile = open(statsfile_name,'r')
+            statsobj = json.loads(statsfile.read())
+        except:
+            statsobj = {}
+        if attempting in statsobj:
+            statsobj[attempting][0]+= 1
+            statsobj[attempting][1]+= step_time
+        else:
+            statsobj[attempting] = [1, step_time]
+        if statsfile:
+            statsfile.close()
+        statsfile = open(statsfile_name,'w')
+        statsfile.write(json.dumps(statsobj))
+        statsfile.close()
+    return (time_taken, solutions)
 
-checkpoint = False
+def get_some_numbers() -> tuple:
+    number_list = []
+    large_numbers = LARGE_NUMBERS.copy()
+    lrg = random.randint(0, 4)
+    sml = 6 - lrg
+    while lrg > 0:
+        l = len(large_numbers) - 1
+        x = large_numbers[random.randint(0,l)]
+        number_list.append(x)
+        large_numbers.remove(x)
+        lrg-= 1
+    while sml > 0:
+        number_list.append(random.randint(1, 10))
+        sml-= 1
+    numbers = " ".join(str(x) for x in number_list)
+    return (number_list, numbers)
 
 if __name__ == '__main__':
     warnings.filterwarnings('error')
     while True:
-        large_numbers = LARGE_NUMBERS.copy()
-        number_list = []
         numbers = input("Enter your numbers: ").strip().lower()
         if numbers == "quit" or numbers == "exit":
             break
         if not numbers:
-            lrg = random.randint(0, 4)
-            sml = 6 - lrg
-            while lrg > 0:
-                l = len(large_numbers) - 1
-                x = large_numbers[random.randint(0,l)]
-                number_list.append(x)
-                large_numbers.remove(x)
-                lrg-= 1
-            while sml > 0:
-                number_list.append(random.randint(1, 10))
-                sml-= 1
-            numbers = " ".join(str(x) for x in number_list)
+            (number_list, numbers) = get_some_numbers()
         else:
             try:
                 number_list = [int(x) for x in numbers.split(" ")]
@@ -746,7 +828,6 @@ if __name__ == '__main__':
                 continue
         if len(number_list) != 6:
             continue
-        print("Numbers:", numbers)
         while True:
             target = input("Enter your target: ").strip()
             if not target:
@@ -759,61 +840,8 @@ if __name__ == '__main__':
                 except:
                     continue
             break
+        print("Numbers:", numbers)
         print("Target:", target)
-        starttime = time.time()
-        checkpoint = False
-        solutions = None
-        if not solutions:
-            attempting = "do_split 3,3"
-            print(attempting)
-            checkpointtime = time.time()
-            solutions = do_split(number_list, 3, target, False)
-        if not solutions:
-            attempting = "do_small_factorization"
-            print(attempting)
-            checkpointtime = time.time()
-            solutions = do_small_factorization(number_list, target)
-        if not solutions:
-            attempting = "do_prime_factorization"
-            print(attempting)
-            checkpointtime = time.time()
-            solutions = do_prime_factorization(number_list, target)
-        if not solutions:
-            attempting = "do_rough_factorization"
-            print(attempting)
-            checkpointtime = time.time()
-            solutions = do_rough_factorization(number_list, target)
-        if not solutions:
-            attempting = "do_rough_rough_factorization"
-            print(attempting)
-            checkpointtime = time.time()
-            solutions = do_rough_rough_factorization(number_list, target)
-        if not solutions or solutions[2] != 0:
-            checkpoint = True
-            attempting = "do_numbers_(brute_force)"
-            print(attempting)
-            checkpointtime = time.time()
-            solutions = do_numbers(number_list, target, 100)
-        currenttime = time.time()
-        time_taken = int(currenttime-starttime)+1
-        step_time = int(currenttime-checkpointtime)+1
+        (time_taken, solutions) = numbers_main(number_list, target)
         print("Execution:", time_taken, "seconds")
         print("Solution:", format_solution(solutions))
-        if solutions and solutions[2] == 0:
-            # Log how solution was achieved to provide stats to help improve
-            statsfile = None
-            try:
-                statsfile = open('stats.json','r')
-                statsobj = json.loads(statsfile.read())
-            except:
-                statsobj = {}
-            if attempting in statsobj:
-                statsobj[attempting][0]+= 1
-                statsobj[attempting][1]+= step_time
-            else:
-                statsobj[attempting] = [1, step_time]
-            if statsfile:
-                statsfile.close()
-            statsfile = open('stats.json','w')
-            statsfile.write(json.dumps(statsobj))
-            statsfile.close()
