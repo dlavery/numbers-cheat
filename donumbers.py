@@ -559,7 +559,7 @@ def do_small_factorization(numbers:list[int], target:int, debug:bool=False) -> t
         q0 = target // small
         if q0 < 6:
             q0 = 6
-        for q in range(q0-5, q0+6):     # range of quotients
+        for q in range(q0-4, q0+5):     # range of quotients
             p = q * small               # product      
             r = target - p              # remainder
             if debug:
@@ -648,7 +648,7 @@ def apply_brackets_4(expression:str):
 
 def do_split(numbers:list[int], size:int, target:int, debug:bool=False) -> tuple:
     ''' 
-    Split numbers list into 2 groups (larger group indicated by size argument)
+    Split numbers list into 2 groups (first group indicated by size argument)
     and try to make the target
     '''
     OPERATIONS = ("+", "-", "*", "/")
@@ -742,6 +742,12 @@ def numbers_main(number_list:list[int], target:int, silent:bool=False, autofile:
             print(attempting)
         checkpointtime = time.time()
         solutions = do_split(number_list, 3, target, False)
+    if not solutions:
+        attempting = "do_split 2,4"
+        if not silent:
+            print(attempting)
+        checkpointtime = time.time()
+        solutions = do_split(number_list, 2, target, False)
     if not solutions:
         attempting = "do_small_factorization"
         if not silent:
