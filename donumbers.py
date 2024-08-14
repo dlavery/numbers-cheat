@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import sys
 import random
 import re
 import time
@@ -8,9 +9,12 @@ from itertools import combinations
 from itertools import permutations
 from itertools import product
 from numberutils import factorize_by_trial_division
+import multiprocessing as mp
+import warnings 
 
 LARGE_NUMBERS = [100, 75, 50, 25]
 checkpoint = False
+warnings.filterwarnings('ignore') 
 
 def complement(a:list, b:tuple):
     c = a.copy()
@@ -332,17 +336,20 @@ def crunch_numbers(nos:list[int], permsize:int, target:int, variance:int, debug:
             
     return res
 
-def do_numbers(nos:list[int], target:int, variance:int, silent:bool=False) -> tuple:
+def do_numbers(nos:list[int], target:int, variance:int, silent:bool=False, startfrom:int=2, queue:mp.Queue=None) -> tuple:
     ''' 
     Find a target number within variance by applying the mathematical operators
     supplied (+, -, * or /) on a list of numbers provided (note that each number 
     can only be used once).
     '''
+    fnID = 'do_numbers_(brute_force)'
     if target in nos:
+        if queue:       # invoked asynchronously
+            queue.put(fnID + ' ' + format_solution(res))
         return (str(int(target)), target, 0)
     res = ()
     noslen = len(nos)
-    i = 2
+    i = startfrom
     global checkpoint
     while i <= noslen:
         # Timeout, return best answer
@@ -380,6 +387,8 @@ def do_numbers(nos:list[int], target:int, variance:int, silent:bool=False) -> tu
                 res = res2
         i+= 1
     
+    if queue:       # invoked asynchronously
+        queue.put(fnID + ' ' + format_solution(res))
     return res
 
 def strip_numbers(expr:str, nos:list[int]) -> list[int]:
@@ -395,10 +404,13 @@ def strip_numbers(expr:str, nos:list[int]) -> list[int]:
             numbers.remove(int_n)
     return numbers    
 
-def do_prime_factorization(numbers:list[int], target:int) -> tuple:
+def do_prime_factorization(numbers:list[int], target:int, queue:mp.Queue=None) -> tuple:
     res = ()
+    fnID = 'do_prime_factorization'
     factors = factorize_by_trial_division(target)
     if not factors: # target is prime
+        if queue:       # invoked asynchronously
+            queue.put(fnID + ' ' + format_solution(()))
         return ()
     used = []
     for f in factors:
@@ -417,11 +429,14 @@ def do_prime_factorization(numbers:list[int], target:int) -> tuple:
         if res:
             break
 
+    if queue:       # invoked asynchronously
+        queue.put(fnID + ' ' + format_solution(res))
     return res
 
-def do_rough_factorization(numbers:list[int], target:int, debug:bool=False) -> tuple:
+def do_rough_factorization(numbers:list[int], target:int, debug:bool=False, queue:mp.Queue=None) -> tuple:
     ''' Roughly factorize using the large numbers '''
     best = ()
+    fnID = 'do_rough_factorization'
     for large in LARGE_NUMBERS:
         nos = numbers.copy()
         if not large in nos:
@@ -444,6 +459,8 @@ def do_rough_factorization(numbers:list[int], target:int, debug:bool=False) -> t
                 if r == 0:  # no remainder
                     expr=str(large)+'*('+str(resq[0])+')'
                     best = (expr, int(eval(expr)), 0)
+                    if queue:       # invoked asynchronously
+                        queue.put(fnID + ' ' + format_solution(best))
                     return best
                 newlist = strip_numbers(resq[0], nos)
                 if debug:
@@ -465,12 +482,17 @@ def do_rough_factorization(numbers:list[int], target:int, debug:bool=False) -> t
                             expr=expr+'+('+str(resr[0])+')'
                         if not best:
                             best = (expr, v, target-v)
+                            if queue:       # invoked asynchronously
+                                queue.put(fnID + ' ' + format_solution(best))
                             return best
+    if queue:       # invoked asynchronously
+        queue.put(fnID + ' ' + format_solution(best))
     return best
 
-def do_rough_rough_factorization(numbers:list[int], target:int, debug:bool=False) -> tuple:
+def do_rough_rough_factorization(numbers:list[int], target:int, debug:bool=False, queue:mp.Queue=None) -> tuple:
     ''' Very roughly factorize using the large numbers '''
     best = ()
+    fnID = 'do_rough_rough_factorization'
     for large in LARGE_NUMBERS:
         nos = numbers.copy()
         q1 = target // large
@@ -507,6 +529,8 @@ def do_rough_rough_factorization(numbers:list[int], target:int, debug:bool=False
                                 best = (bestexpr, p, target-p)
                                 if debug:
                                     print('1. best updated', best)
+                                if queue:       # invoked asynchronously
+                                    queue.put(fnID + ' ' + format_solution(best))
                                 return best
                             else:
                                 newnewlist = strip_numbers(resd[0], newlist)
@@ -536,6 +560,8 @@ def do_rough_rough_factorization(numbers:list[int], target:int, debug:bool=False
                                         if debug:
                                             print('2. best updated', best)
                                     if best[2]==0:
+                                        if queue:       # invoked asynchronously
+                                            queue.put(fnID + ' ' + format_solution(best))
                                         return best
                                 else:
                                     bestexpr = '('+resd[0]+')*('+resq[0]+')'
@@ -546,10 +572,13 @@ def do_rough_rough_factorization(numbers:list[int], target:int, debug:bool=False
                                         if debug:
                                             print('3. best updated', best)
 
+    if queue:       # invoked asynchronously
+        queue.put(fnID + ' ' + format_solution(best))
     return best
 
-def do_small_factorization(numbers:list[int], target:int, debug:bool=False) -> tuple:
+def do_small_factorization(numbers:list[int], target:int, debug:bool=False, queue:mp.Queue=None) -> tuple:
     ''' Roughly factorize using the small numbers '''
+    fnID = 'do_small_factorization'
     best = ()
     for small in numbers:
         if small > 10:
@@ -567,6 +596,8 @@ def do_small_factorization(numbers:list[int], target:int, debug:bool=False) -> t
             # We need to make quotient and remainder from numbers list
             if q in nos and r == 0:
                 best = (str(small)+'*'+str(q), target, 0)
+                if queue:       # invoked asynchronously
+                    queue.put(fnID + ' ' + format_solution(best))
                 return best
             qres = (crunch_numbers(nos, x+1, q, 0) for x in range(4))
             for resq in qres:
@@ -577,6 +608,8 @@ def do_small_factorization(numbers:list[int], target:int, debug:bool=False) -> t
                 if r == 0:  # no remainder
                     expr=str(small)+'*('+str(resq[0])+')'
                     best = (expr, int(eval(expr)), 0)
+                    if queue:       # invoked asynchronously
+                        queue.put(fnID + ' ' + format_solution(best))
                     return best
                 newlist = strip_numbers(resq[0], nos)
                 if debug:
@@ -598,7 +631,11 @@ def do_small_factorization(numbers:list[int], target:int, debug:bool=False) -> t
                             expr=expr+'+('+str(resr[0])+')'
                         if not best:
                             best = (expr, v, target-v)
+                            if queue:       # invoked asynchronously
+                                queue.put(fnID + ' ' + format_solution(best))
                             return best
+    if queue:       # invoked asynchronously
+        queue.put(fnID + ' ' + format_solution(best))
     return best
 
 def apply_brackets(expression:str):
@@ -646,12 +683,13 @@ def apply_brackets_4(expression:str):
     expressions.append(e)
     return expressions
 
-def do_split(numbers:list[int], size:int, target:int, debug:bool=False) -> tuple:
+def do_split(numbers:list[int], size:int, target:int, debug:bool=False, queue:mp.Queue=None) -> tuple:
     ''' 
     Split numbers list into 2 groups (first group indicated by size argument)
     and try to make the target
     '''
     OPERATIONS = ("+", "-", "*", "/")
+    fnID = 'do_split ' + str(size) + ',' + str(len(numbers)-size)
     j = 1
     opslist = []
     while j < size:
@@ -689,10 +727,14 @@ def do_split(numbers:list[int], size:int, target:int, debug:bool=False) -> tuple
                     if soln:
                         e2 = "(" + e + ")*(" + soln[0] + ")"
                         if eval(e2) == target:
+                            if queue:       # invoked asynchronously
+                                queue.put(fnID + ' ' + format_solution((e2, target, 0)))
                             return (e2, target, 0)
                     add = target - v
                     soln = do_numbers(list(c_), add, 0, True)
                     if soln:
+                        if queue:       # invoked asynchronously
+                            queue.put(fnID + ' ' + format_solution(("(" + e + ")+(" + soln[0] + ")", target, 0)))
                         return ("(" + e + ")+(" + soln[0] + ")", target, 0)
                 elif v > target:
                     m = v // target
@@ -700,15 +742,23 @@ def do_split(numbers:list[int], size:int, target:int, debug:bool=False) -> tuple
                     if soln:
                         e2 = "(" + e + ")/(" + soln[0] + ")"
                         if eval(e2) == target:
+                            if queue:       # invoked asynchronously
+                                queue.put(fnID + ' ' + format_solution((e2, target, 0)))
                             return (e2, target, 0)
                     sub = v - target
                     soln = do_numbers(list(c_), sub, 0, True)
                     if soln:
+                        if queue:       # invoked asynchronously
+                            queue.put(fnID + ' ' + format_solution(("(" + e + ")-(" + soln[0] + ")", target, 0)))
                         return ("(" + e + ")-(" + soln[0] + ")", target, 0)
                 else:
+                    if queue:       # invoked asynchronously
+                        queue.put(fnID + ' ' + format_solution((e, target, 0)))
                     return (e, target, 0)
             except ZeroDivisionError:
                 continue
+    if queue:       # invoked asynchronously
+        queue.put(fnID + ' ' + format_solution(()))
     return ()
 
 def check_solution(solutions:tuple) -> bool:
@@ -727,7 +777,8 @@ def format_solution(solutions:tuple) -> str:
     else:
         return "No solution"
 
-def numbers_main(number_list:list[int], target:int, silent:bool=False, autofile:bool=False) -> tuple:
+def numbers_main_sync(number_list:list[int], target:int, silent:bool=False, autofile:str=None) -> tuple:
+    warnings.filterwarnings('error')
     starttime = time.time()
     if autofile:
         statsfile_name = 'stats-'+autofile+'.json'
@@ -778,7 +829,7 @@ def numbers_main(number_list:list[int], target:int, silent:bool=False, autofile:
             checkpoint = True
             print(attempting)
         checkpointtime = time.time()
-        solutions = do_numbers(number_list, target, 100, silent)
+        solutions = do_numbers(number_list, target, 100, silent, 5)
     currenttime = time.time()
     time_taken = int(currenttime-starttime)+1
     step_time = int(currenttime-checkpointtime)+1
@@ -802,6 +853,56 @@ def numbers_main(number_list:list[int], target:int, silent:bool=False, autofile:
         statsfile.close()
     return (time_taken, solutions)
 
+def numbers_main_async(number_list:list[int], target:int, silent:bool=True) -> tuple:
+    global checkpoint
+    checkpoint = False
+    Q = mp.Queue()
+    
+    processes = []
+    processes.append(mp.Process(target=do_split, args=(number_list, 3, target, False, Q)))
+    processes.append(mp.Process(target=do_split, args=(number_list, 2, target, False, Q)))
+    processes.append(mp.Process(target=do_small_factorization, args=(number_list, target, False, Q)))
+    processes.append(mp.Process(target=do_prime_factorization, args=(number_list, target, Q)))
+    processes.append(mp.Process(target=do_rough_factorization, args=(number_list, target, False, Q)))
+    processes.append(mp.Process(target=do_rough_rough_factorization, args=(number_list, target, False, Q)))
+    processes.append(mp.Process(target=do_numbers, args=(number_list, target, 10, silent, 5, Q)))
+
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        m = Q.get()
+        print(m)
+
+    return (0, None)
+
+def numbers_main_test(number_list:list[int], target:int, silent:bool=False, autofile:str=None) -> tuple:
+    warnings.filterwarnings('error')
+    global checkpoint
+    checkpoint = False
+    attempting = "do_split 3,3"
+    solutions = do_split(number_list, 3, target, False)
+    print(attempting, format_solution(solutions))
+    attempting = "do_split 2,4"
+    solutions = do_split(number_list, 2, target, False)
+    print(attempting, format_solution(solutions))
+    attempting = "do_small_factorization"
+    solutions = do_small_factorization(number_list, target)
+    print(attempting, format_solution(solutions))
+    attempting = "do_prime_factorization"
+    solutions = do_prime_factorization(number_list, target)
+    print(attempting, format_solution(solutions))
+    attempting = "do_rough_factorization"
+    solutions = do_rough_factorization(number_list, target)
+    print(attempting, format_solution(solutions))
+    attempting = "do_rough_rough_factorization"
+    solutions = do_rough_rough_factorization(number_list, target)
+    print(attempting, format_solution(solutions))
+    attempting = "do_numbers_(brute_force)"
+    solutions = do_numbers(number_list, target, 100, silent, 5)
+    print(attempting, format_solution(solutions))
+    return (0, None)
+
 def get_some_numbers() -> tuple:
     number_list = []
     large_numbers = LARGE_NUMBERS.copy()
@@ -820,7 +921,6 @@ def get_some_numbers() -> tuple:
     return (number_list, numbers)
 
 if __name__ == '__main__':
-    warnings.filterwarnings('error')
     while True:
         numbers = input("Enter your numbers: ").strip().lower()
         if numbers == "quit" or numbers == "exit":
@@ -848,6 +948,13 @@ if __name__ == '__main__':
             break
         print("Numbers:", numbers)
         print("Target:", target)
-        (time_taken, solutions) = numbers_main(number_list, target)
-        print("Execution:", time_taken, "seconds")
-        print("Solution:", format_solution(solutions))
+        if len(sys.argv) > 1 and sys.argv[1] == 'test':
+            (time_taken, solutions) = numbers_main_test(number_list, target)
+        else:
+            if len(sys.argv) > 1 and sys.argv[1] == 'sync':
+                (time_taken, solutions) = numbers_main_sync(number_list, target)
+            else:
+                (time_taken, solutions) = numbers_main_async(number_list, target)
+            if time_taken > 0:
+                print("Execution:", time_taken, "seconds")
+                print("Solution:", format_solution(solutions))

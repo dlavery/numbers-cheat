@@ -2,7 +2,7 @@
 import random
 import time
 import warnings
-from donumbers import numbers_main
+from donumbers import numbers_main_sync
 from donumbers import get_some_numbers
 from donumbers import format_solution
 
@@ -14,7 +14,7 @@ if __name__ == '__main__':
         # do lots of tests and report those that don't meet target or take too long
         (numbers, _) = get_some_numbers()
         target = random.randint(100, 999)
-        (time_taken, solutions) = numbers_main(numbers, target, True, autofile)
+        (time_taken, solutions) = numbers_main_sync(numbers, target, True, autofile)
         if time_taken > 30 or eval(solutions[0]) != target:
             print("Numbers:", numbers, "Target:", target, "Time:", time_taken, "Best:", format_solution(solutions))
         i+= 1
