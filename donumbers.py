@@ -866,6 +866,7 @@ def numbers_main_async(number_list:list[int], target:int, silent:bool=True) -> t
     processes.append(mp.Process(target=do_rough_factorization, args=(number_list, target, False, Q)))
     processes.append(mp.Process(target=do_rough_rough_factorization, args=(number_list, target, False, Q)))
     processes.append(mp.Process(target=do_numbers, args=(number_list, target, 10, silent, 5, Q)))
+    processes.append(mp.Process(target=do_timer, args=(Q,)))
 
     for p in processes:
         p.start()
@@ -902,6 +903,17 @@ def numbers_main_test(number_list:list[int], target:int, silent:bool=False, auto
     solutions = do_numbers(number_list, target, 100, silent, 5)
     print(attempting, format_solution(solutions))
     return (0, None)
+
+def do_timer(queue:mp.Queue):
+    starttime = time.time()
+    elapsedtime = 0
+    while elapsedtime < 100:
+        if elapsedtime > 29:
+            queue.put('30 seconds!')
+            break
+        time.sleep(10)
+        elapsedtime = int(time.time() - starttime)
+    return
 
 def get_some_numbers() -> tuple:
     number_list = []
