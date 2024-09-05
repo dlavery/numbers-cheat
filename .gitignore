@@ -164,3 +164,4 @@ cython_debug/
 # Custom
 stats*.json
 test-output*
+*.code-workspace
